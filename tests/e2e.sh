@@ -13,13 +13,14 @@ cat >"$CONF" <<EOF
 set -g prefix C-b
 set -g status off
 set -g @palette-key P
+bind-key H display-message hello-from-H
 run-shell "$ROOT/palette.tmux"
 EOF
 
 # user actions file: one custom action + one override
 mkdir -p "$XDG/tmux-palette"
 cat >"$XDG/tmux-palette/actions.sh" <<'EOF'
-action "Custom hello" custom 'tmux set -g @palette-test-hello yes'
+action "Custom hello" custom 'tmux set -g @palette-test-hello yes' 'display-message hello-from-H'
 EOF
 
 export XDG_CONFIG_HOME="$XDG"
@@ -35,6 +36,16 @@ check() { # check <description> <actual> <expected>
   if [ "$2" = "$3" ]; then echo "ok   - $1"; pass=$((pass+1))
   else echo "FAIL - $1 (got '$2', want '$3')"; fail=$((fail+1)); fi
 }
+
+# key column: default binding for split-window -h is %, rename pane has no key
+k C-b P; k -l "split right"
+check "shows bound key"    "$(T capture-pane -p -t host | grep -c 'Split right.*prefix %')" 1
+k C-u; k -l "rename pane"
+check "shows tmux command when unbound" "$(T capture-pane -p -t host | grep -c 'Rename pane.*:select-pane -T')" 1
+k Escape
+k C-b P; k -l "custom hello"
+check "user action shows its key" "$(T capture-pane -p -t host | grep -c 'Custom hello.*prefix H')" 1
+k Escape
 
 palette "split right";   check "split right"   "$(T list-panes -t target | wc -l | tr -d ' ')" 2
 palette "rename pane";   k C-u; k -l "logs"; k Enter

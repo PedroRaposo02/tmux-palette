@@ -5,14 +5,16 @@ A command palette for tmux. Press a key, type what you want in plain words —
 No more remembering `prefix ,` or `select-pane -T`.
 
 ```
-╭──────────────────────── palette ────────────────────────╮
-│ › ren pa  < 3/47                                         │
-│ > Rename pane                pane                        │
-│   Rename window              window                      │
-│   Rename session             session                     │
-╰──────────────────────────────────────────────────────────╯
+╭───────────────────────────── palette ─────────────────────────────╮
+│ › ren  < 3/47                                                       │
+│ > Rename pane              pane               :select-pane -T  │
+│   Rename window            window                   prefix ,  │
+│   Rename session           session                  prefix $  │
+╰─────────────────────────────────────────────────────────────────────╯
 ```
 
+- **Teaches you the shortcuts** — each action shows, on the right, the key it's bound to *in your config*
+  (looked up live, so rebinds show up), or the raw `:command` when nothing is bound
 - **Fuzzy search** over ~45 named actions for sessions, windows, panes, copy and tmux itself
 - **Prompts when needed** — renames are pre-filled with the current name, kills ask y/N
 - **Pickers** for anything that targets something else (switch session, move window to session, join pane…)
@@ -61,6 +63,7 @@ set -g @palette-width '60%'
 set -g @palette-height '60%'
 set -g @palette-title ' palette '
 set -g @palette-fzf-options ''        # extra fzf flags, e.g. '--color=dark'
+set -g @palette-show-keys 'on'        # key / command column in front of each action
 set -g @palette-actions-file '~/.config/tmux-palette/actions.sh'
 ```
 
@@ -69,8 +72,8 @@ set -g @palette-actions-file '~/.config/tmux-palette/actions.sh'
 Create `~/.config/tmux-palette/actions.sh` (or wherever `@palette-actions-file` points):
 
 ```bash
-# action "<name>" "<group>" '<bash snippet>'
-action "Open lazygit"   tools 'tmux display-popup -E -d "$(here)" -w 90% -h 90% lazygit'
+# action "<name>" "<group>" '<bash snippet>' ['<tmux command>' ['<match regex>']]
+action "Open lazygit"   tools 'tmux display-popup -E -d "$(here)" -w 90% -h 90% lazygit' 'display-popup lazygit' 'lazygit'
 action "htop"           tools 'tmux new-window -a -t "$WINDOW" htop'
 action "SSH to server"  tools 'h=$(printf "web1\ndb1\n" | choose "host › ") && tmux new-window -a -t "$WINDOW" "ssh $h"'
 
@@ -80,6 +83,11 @@ action "Kill pane"      pane  'confirm "Really?" && tmux kill-pane -t "$PANE"'
 # hide a built-in
 remove_action "Kill server"
 ```
+
+The optional 4th argument is the equivalent tmux command. The palette searches your key
+bindings for it and shows the key in front of the action, or shows `:<command>` if nothing
+is bound. When a binding doesn't contain the command text literally (a script path, a popup),
+pass a 5th argument: an extended regex matched against the bound commands instead.
 
 Snippets run in bash inside the popup, with these available:
 
