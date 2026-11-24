@@ -59,7 +59,7 @@ Reload tmux (`tmux source ~/.tmux.conf`).
 ```tmux
 set -g @palette-key 'P'               # key after the prefix ('none' to disable)
 set -g @palette-root-key ''           # optional key without prefix, e.g. 'M-p' (Alt+p)
-set -g @palette-width '60%'
+set -g @palette-width '80%'          # the columns adapt: narrow popups drop the group column
 set -g @palette-height '60%'
 set -g @palette-title ' palette '
 set -g @palette-fzf-options ''        # extra fzf flags, e.g. '--color=dark'

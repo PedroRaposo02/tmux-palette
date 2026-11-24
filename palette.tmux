@@ -10,7 +10,7 @@ opt() { # opt <name> <default>
 
 key=$(opt @palette-key P)
 root_key=$(opt @palette-root-key "")
-width=$(opt @palette-width 60%)
+width=$(opt @palette-width 80%)
 height=$(opt @palette-height 60%)
 title=$(opt @palette-title " palette ")
 

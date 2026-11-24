@@ -108,23 +108,46 @@ groupw=0
 for i in "${!NAMES[@]}"; do [ ${#GROUPS_[$i]} -gt "$groupw" ] && groupw=${#GROUPS_[$i]}; done
 cols=$(stty size </dev/tty 2>/dev/null | cut -d' ' -f2)   # popup's inner width
 [[ $cols =~ ^[0-9]+$ ]] || cols=80
+
+# ── layout: fit name · group · key into the popup width ──
+# Priority: name column, then real keys (prefix ,); drop the group column first when short
+# on space, and trim long ":command" hints with … rather than letting fzf clip the line.
+budget=$(( cols - 4 ))          # fzf pointer (2) + right margin (2)
+keyw=0 showgroup=1
+if [ "$SHOW_KEYS" = on ] && [ "$width" -gt 0 ]; then
+  keyw=$(( budget - namew - 2 - groupw - 2 ))
+  if [ "$keyw" -lt 14 ] && [ "$keyw" -lt "$width" ]; then   # not enough room: drop groups
+    showgroup=0; keyw=$(( budget - namew - 2 ))
+  fi
+  [ "$keyw" -gt "$width" ] && keyw=$width
+  if [ "$keyw" -lt 10 ]; then        # tiny popup: shrink the name column instead
+    keyw=$(( width < 10 ? width : 10 ))
+    namew=$(( budget - keyw - 2 )); [ "$namew" -lt 12 ] && namew=12
+  fi
+fi
+[ $showgroup = 1 ] && groupcol=$(( groupw + 2 )) || groupcol=0
+
+fit() { # fit <text> <width>: cut to width with a trailing … when too long
+  if [ ${#1} -gt "$2" ]; then printf '%s…' "${1:0:$(( $2 - 1 ))}"; else printf '%s' "$1"; fi
+}
+
 list() {
-  local i k pad
+  local i k pad g name
   for i in "${!NAMES[@]}"; do
+    name=$(fit "${NAMES[$i]}" "$namew")
+    g=""; [ $showgroup = 1 ] && g=$(printf '  \033[2m%-*s\033[0m' "$groupw" "${GROUPS_[$i]}")
     k=""
-    if [ "$SHOW_KEYS" = on ] && [ -n "${KEYTXT[$i]}" ]; then
-      # right-align the key against the popup edge (fzf's pointer takes 2 columns)
-      pad=$(( cols - 4 - namew - 2 - groupw - width ))
+    if [ "$keyw" -gt 0 ] && [ -n "${KEYTXT[$i]}" ]; then
+      pad=$(( budget - namew - groupcol - keyw ))
       [ "$pad" -lt 2 ] && pad=2
-      k=$(printf '%*s' "$pad" "")$(printf '%*.*s' "$width" "$width" "${KEYTXT[$i]}")
-      k=$'\033['"${KEYCLR[$i]}m$k"$'\033[0m'
+      k=$(printf '%*s' "$pad" "")$'\033['"${KEYCLR[$i]}m"$(printf '%*s' "$keyw" "$(fit "${KEYTXT[$i]}" "$keyw")")$'\033[0m'
     fi
-    printf '%-*s  \033[2m%-*s\033[0m%s\n' "$namew" "${NAMES[$i]}" "$groupw" "${GROUPS_[$i]}" "$k"
+    printf '%-*s%s%s\n' "$namew" "$name" "$g" "$k"
   done
 }
 
 read -r -a extra_opts <<<"$(tmux show-option -gqv @palette-fzf-options)"
-out=$(list | fzf --ansi --delimiter=' {2,}' --nth=1,2 --print-query --reverse --tiebreak=begin,index \
+out=$(list | fzf --ansi --delimiter=' {2,}' --nth="$([ $showgroup = 1 ] && echo 1,2 || echo 1)" --print-query --reverse --tiebreak=begin,index \
   --border=none --prompt='› ' --info=inline \
   --header='type what you want · enter: run · no match: run as tmux command' \
   "${extra_opts[@]}")
@@ -140,8 +163,11 @@ if [ -z "$pick" ]; then
 fi
 
 for i in "${!NAMES[@]}"; do
-  if [ "${NAMES[$i]}" = "$pick" ]; then
-    eval "${CMDS[$i]}"
-    exit
-  fi
+  [ "${NAMES[$i]}" = "$pick" ] && { eval "${CMDS[$i]}"; exit; }
 done
+# name was trimmed with … to fit a narrow popup: match on what's left
+if [[ $pick == *… ]]; then
+  for i in "${!NAMES[@]}"; do
+    [[ ${NAMES[$i]} == "${pick%…}"* ]] && { eval "${CMDS[$i]}"; exit; }
+  done
+fi
